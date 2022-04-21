@@ -15,6 +15,7 @@ documentation = "https://docs.terraswap.io"
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
+terra = []
 
 [dependencies]
 cw20 = { version = "0.11.0" } 

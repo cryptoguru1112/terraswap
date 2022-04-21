@@ -1,7 +1,5 @@
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{
-    from_binary, to_binary, Coin, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
-};
+use cosmwasm_std::{from_binary, to_binary, Coin, CosmosMsg, StdError, SubMsg, Uint128, WasmMsg};
 
 use crate::contract::{execute, instantiate, query};
 use terraswap::mock_querier::mock_dependencies;
@@ -14,6 +12,9 @@ use terraswap::router::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
     SimulateSwapOperationsResponse, SwapOperation,
 };
+
+#[cfg(feature = "terra")]
+use cosmwasm_std::Decimal;
 
 #[test]
 fn proper_initialization() {
@@ -316,6 +317,8 @@ fn execute_swap_operation() {
             liquidity_token: "liquidity0000".to_string(),
         },
     )]);
+
+    #[cfg(feature = "terra")]
     deps.querier.with_tax(
         Decimal::percent(5),
         &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
@@ -373,7 +376,10 @@ fn execute_swap_operation() {
             "addr0000".to_string(),
             Coin {
                 denom: "uusd".to_string(),
+                #[cfg(feature = "terra")]
                 amount: Uint128::from(952380u128), // deduct tax
+                #[cfg(not(feature = "terra"))]
+                amount: Uint128::from(1000000u128)
             },
             "uluna".to_string()
         ))],
@@ -451,6 +457,7 @@ fn query_buy_with_routes() {
     // we can just call .unwrap() to assert this was a success
     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
+    #[cfg(feature = "terra")]
     // set tax rate as 5%
     deps.querier.with_tax(
         Decimal::percent(5),
@@ -524,7 +531,10 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
+            #[cfg(feature = "terra")]
             amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => asset0000, asset0000 => uluna
+            #[cfg(not(feature = "terra"))]
+            amount: Uint128::from(1000000u128)
         }
     );
 
@@ -547,7 +557,10 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
-            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => uluna
+            #[cfg(feature = "terra")]
+            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => asset0000, asset0000 => uluna
+            #[cfg(not(feature = "terra"))]
+            amount: Uint128::from(1000000u128)
         }
     );
 }

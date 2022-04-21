@@ -1,7 +1,10 @@
 use crate::asset::{Asset, AssetInfo, PairInfo};
 use crate::factory::QueryMsg as FactoryQueryMsg;
 use crate::pair::{QueryMsg as PairQueryMsg, ReverseSimulationResponse, SimulationResponse};
-use crate::query::{QueryActivesResponse, QueryDenomTraceRequest, QueryDenomTraceResponse};
+use crate::query::{
+    QueryDenomMetadataRequest, QueryDenomMetadataResponse, QueryDenomTraceRequest,
+    QueryDenomTraceResponse,
+};
 
 use cosmwasm_std::{
     to_binary, to_vec, Addr, AllBalanceResponse, BalanceResponse, BankQuery, Binary, Coin, Empty,
@@ -117,21 +120,6 @@ pub fn reverse_simulate(
     }))
 }
 
-pub fn query_active_denoms(querier: &QuerierWrapper<TerraQueryWrapper>) -> StdResult<Vec<String>> {
-    let req = to_vec::<QueryRequest<Empty>>(&QueryRequest::Stargate {
-        path: "/terra.oracle.v1beta1.Query/Actives".to_string(),
-        data: Binary::from(vec![]),
-    })
-    .unwrap();
-
-    let res: Binary = querier.raw_query(req.as_slice()).unwrap().unwrap();
-
-    let res: QueryActivesResponse = Message::parse_from_bytes(res.as_slice())
-        .map_err(|_| StdError::parse_err("QueryActivesResponse", "failed to parse data"))?;
-
-    Ok(res.actives.to_vec())
-}
-
 pub fn query_ibc_denom(
     querier: &QuerierWrapper<TerraQueryWrapper>,
     denom: String,
@@ -157,4 +145,25 @@ pub fn query_ibc_denom(
         .map_err(|_| StdError::parse_err("QueryDenomTraceResponse", "failed to parse data"))?;
 
     Ok(res.denom_trace.unwrap().base_denom)
+}
+
+pub fn query_denom_info(
+    querier: &QuerierWrapper<TerraQueryWrapper>,
+    denom: String,
+) -> StdResult<String> {
+    let mut req = QueryDenomMetadataRequest::new();
+    req.set_denom(denom);
+    let binary_req: Binary = Binary::from(req.write_to_bytes().unwrap());
+
+    let req = to_vec::<QueryRequest<Empty>>(&QueryRequest::Stargate {
+        path: "/cosmos.bank.v1beta1.Query/DenomMetadata".to_string(),
+        data: binary_req,
+    })
+    .unwrap();
+
+    let res: Binary = querier.raw_query(req.as_slice()).unwrap().unwrap();
+    let res: QueryDenomMetadataResponse = Message::parse_from_bytes(res.as_slice())
+        .map_err(|_| StdError::parse_err("QueryDenomMetadataResponse", "failed to parse data"))?;
+
+    Ok(res.get_metadata().base.to_string())
 }

@@ -507,6 +507,7 @@ fn withdraw_liquidity() {
         amount: Uint128::from(100u128),
     }]);
 
+    #[cfg(feature = "terra")]
     deps.querier.with_tax(
         Decimal::zero(),
         &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
@@ -627,6 +628,7 @@ fn try_native_to_token() {
         amount: collateral_pool_amount + offer_amount, /* user deposit must be pre-applied */
     }]);
 
+    #[cfg(feature = "terra")]
     deps.querier.with_tax(
         Decimal::zero(),
         &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
@@ -709,6 +711,7 @@ fn try_native_to_token() {
     let expected_return_amount = expected_ret_amount
         .checked_sub(expected_commission_amount)
         .unwrap();
+    #[cfg(feature = "terra")]
     let expected_tax_amount = Uint128::zero(); // no tax for token
 
     // check simulation res
@@ -773,6 +776,7 @@ fn try_native_to_token() {
             attr("ask_asset", "asset0000"),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
+            #[cfg(feature = "terra")]
             attr("tax_amount", expected_tax_amount.to_string()),
             attr("spread_amount", expected_spread_amount.to_string()),
             attr("commission_amount", expected_commission_amount.to_string()),
@@ -805,6 +809,7 @@ fn try_token_to_native() {
         denom: "uusd".to_string(),
         amount: collateral_pool_amount,
     }]);
+    #[cfg(feature = "terra")]
     deps.querier.with_tax(
         Decimal::percent(1),
         &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
@@ -903,6 +908,7 @@ fn try_token_to_native() {
     let expected_return_amount = expected_ret_amount
         .checked_sub(expected_commission_amount)
         .unwrap();
+    #[cfg(feature = "terra")]
     let expected_tax_amount = std::cmp::min(
         Uint128::from(1000000u128),
         expected_return_amount
@@ -977,6 +983,7 @@ fn try_token_to_native() {
             attr("ask_asset", "uusd"),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
+            #[cfg(feature = "terra")]
             attr("tax_amount", expected_tax_amount.to_string()),
             attr("spread_amount", expected_spread_amount.to_string()),
             attr("commission_amount", expected_commission_amount.to_string()),
@@ -988,9 +995,12 @@ fn try_token_to_native() {
             to_address: "addr0000".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
+                #[cfg(feature = "terra")]
                 amount: expected_return_amount
                     .checked_sub(expected_tax_amount)
                     .unwrap(),
+                #[cfg(not(feature = "terra"))]
+                amount: expected_return_amount
             }],
         })),
         msg_transfer,
@@ -1183,6 +1193,7 @@ fn test_max_spread_with_diff_decimal() {
 }
 
 #[test]
+#[cfg(feature = "terra")]
 fn test_deduct() {
     let mut deps = mock_dependencies(&[]);
 

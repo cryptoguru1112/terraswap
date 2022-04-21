@@ -14,7 +14,8 @@ use std::panic;
 use crate::asset::{Asset, AssetInfo, AssetInfoRaw, PairInfo, PairInfoRaw};
 use crate::pair::SimulationResponse;
 use crate::query::{
-    DenomTrace, QueryActivesResponse, QueryDenomTraceRequest, QueryDenomTraceResponse,
+    DenomTrace, Metadata, QueryDenomMetadataRequest, QueryDenomMetadataResponse,
+    QueryDenomTraceRequest, QueryDenomTraceResponse,
 };
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
 use terra_cosmwasm::{
@@ -49,7 +50,7 @@ pub struct WasmMockQuerier {
     token_querier: TokenQuerier,
     tax_querier: TaxQuerier,
     terraswap_factory_querier: TerraswapFactoryQuerier,
-    oracle_querier: OracleQuerier,
+    bank_querier: BankQuerier,
     ibc_querier: IbcQuerier,
 }
 
@@ -144,14 +145,14 @@ impl Querier for WasmMockQuerier {
 }
 
 #[derive(Clone, Default)]
-pub struct OracleQuerier {
-    actives: Vec<String>,
+pub struct BankQuerier {
+    denoms: Vec<String>,
 }
 
-impl OracleQuerier {
-    pub fn new(actives: &[String]) -> Self {
-        OracleQuerier {
-            actives: actives.to_vec(),
+impl BankQuerier {
+    pub fn new(denoms: &[String]) -> Self {
+        BankQuerier {
+            denoms: denoms.to_vec(),
         }
     }
 }
@@ -335,9 +336,22 @@ impl WasmMockQuerier {
                 }
             }
             QueryRequest::Stargate { path, data } => match path.as_str() {
-                "/terra.oracle.v1beta1.Query/Actives" => {
-                    let mut res: QueryActivesResponse = QueryActivesResponse::new();
-                    res.set_actives(self.oracle_querier.actives.to_vec().into());
+                "/cosmos.bank.v1beta1.Query/DenomMetadata" => {
+                    let req: QueryDenomMetadataRequest = Message::parse_from_bytes(data.as_slice())
+                        .map_err(|_| {
+                            StdError::parse_err("QueryDenomMetadataRequest", "failed to parse data")
+                        })
+                        .unwrap();
+
+                    let mut res: QueryDenomMetadataResponse = QueryDenomMetadataResponse::new();
+                    if self.bank_querier.denoms.contains(&req.denom) {
+                        let mut metadata = Metadata::new();
+                        metadata.set_base(req.denom);
+                        res.set_metadata(metadata);
+                    } else {
+                        return SystemResult::Err(SystemError::Unknown {});
+                    }
+
                     SystemResult::Ok(ContractResult::Ok(Binary::from(
                         res.write_to_bytes().unwrap().to_vec(),
                     )))
@@ -374,7 +388,7 @@ impl WasmMockQuerier {
             token_querier: TokenQuerier::default(),
             tax_querier: TaxQuerier::default(),
             terraswap_factory_querier: TerraswapFactoryQuerier::default(),
-            oracle_querier: OracleQuerier::default(),
+            bank_querier: BankQuerier::default(),
             ibc_querier: IbcQuerier::default(),
         }
     }
@@ -384,6 +398,7 @@ impl WasmMockQuerier {
         self.token_querier = TokenQuerier::new(balances);
     }
 
+    #[cfg(feature = "terra")]
     // configure the token owner mock querier
     pub fn with_tax(&mut self, rate: Decimal, caps: &[(&String, &Uint128)]) {
         self.tax_querier = TaxQuerier::new(rate, caps);
@@ -400,8 +415,8 @@ impl WasmMockQuerier {
         }
     }
 
-    pub fn with_active_denoms(&mut self, actives: &[String]) {
-        self.oracle_querier = OracleQuerier::new(actives);
+    pub fn with_active_denoms(&mut self, denoms: &[String]) {
+        self.bank_querier = BankQuerier::new(denoms);
     }
 
     pub fn with_ibc_denom_traces(&mut self, denom_traces: &[(&String, (&String, &String))]) {

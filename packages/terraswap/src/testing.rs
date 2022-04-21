@@ -5,8 +5,11 @@ use crate::querier::{
 };
 
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
-use cosmwasm_std::{to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
+use cosmwasm_std::{to_binary, Addr, BankMsg, Coin, CosmosMsg, Uint128, WasmMsg};
 use cw20::Cw20ExecuteMsg;
+
+#[cfg(feature = "terra")]
+use cosmwasm_std::Decimal;
 
 #[test]
 fn token_balance_querier() {
@@ -169,6 +172,7 @@ fn test_asset() {
         ],
     )]);
 
+    #[cfg(feature = "terra")]
     deps.querier.with_tax(
         Decimal::percent(1),
         &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
@@ -188,10 +192,12 @@ fn test_asset() {
         },
     };
 
+    #[cfg(feature = "terra")]
     assert_eq!(
         token_asset.compute_tax(&deps.as_ref().querier).unwrap(),
         Uint128::zero()
     );
+    #[cfg(feature = "terra")]
     assert_eq!(
         native_token_asset
             .compute_tax(&deps.as_ref().querier)
@@ -199,6 +205,7 @@ fn test_asset() {
         Uint128::from(1220u128)
     );
 
+    #[cfg(feature = "terra")]
     assert_eq!(
         native_token_asset
             .deduct_tax(&deps.as_ref().querier)
@@ -232,7 +239,10 @@ fn test_asset() {
             to_address: "addr0000".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
+                #[cfg(feature = "terra")]
                 amount: Uint128::from(121903u128),
+                #[cfg(not(feature = "terra"))]
+                amount: Uint128::from(123123u128),
             }]
         })
     );

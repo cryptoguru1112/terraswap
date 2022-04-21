@@ -3,15 +3,20 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::querier::{
-    query_active_denoms, query_balance, query_decimals, query_ibc_denom, query_supply,
+    query_balance, query_decimals, query_denom_info, query_ibc_denom, query_supply,
     query_token_balance,
 };
 use cosmwasm_std::{
-    to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, MessageInfo,
-    QuerierWrapper, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, MessageInfo, QuerierWrapper,
+    StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
-use terra_cosmwasm::{TerraQuerier, TerraQueryWrapper};
+use terra_cosmwasm::TerraQueryWrapper;
+
+#[cfg(feature = "terra")]
+use cosmwasm_std::Decimal;
+#[cfg(feature = "terra")]
+use terra_cosmwasm::TerraQuerier;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {
@@ -25,6 +30,7 @@ impl fmt::Display for Asset {
     }
 }
 
+#[cfg(feature = "terra")]
 static DECIMAL_FRACTION: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 
 impl Asset {
@@ -32,6 +38,7 @@ impl Asset {
         self.info.is_native_token()
     }
 
+    #[cfg(feature = "terra")]
     pub fn compute_tax(&self, querier: &QuerierWrapper<TerraQueryWrapper>) -> StdResult<Uint128> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
@@ -55,6 +62,7 @@ impl Asset {
         }
     }
 
+    #[cfg(feature = "terra")]
     pub fn deduct_tax(&self, querier: &QuerierWrapper<TerraQueryWrapper>) -> StdResult<Coin> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
@@ -69,7 +77,7 @@ impl Asset {
 
     pub fn into_msg(
         self,
-        querier: &QuerierWrapper<TerraQueryWrapper>,
+        _querier: &QuerierWrapper<TerraQueryWrapper>,
         recipient: Addr,
     ) -> StdResult<CosmosMsg> {
         let amount = self.amount;
@@ -83,9 +91,15 @@ impl Asset {
                 })?,
                 funds: vec![],
             })),
-            AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
+            AssetInfo::NativeToken { denom: _denom } => Ok(CosmosMsg::Bank(BankMsg::Send {
                 to_address: recipient.to_string(),
-                amount: vec![self.deduct_tax(querier)?],
+                #[cfg(feature = "terra")]
+                amount: vec![self.deduct_tax(_querier)?],
+                #[cfg(not(feature = "terra"))]
+                amount: vec![Coin {
+                    amount: self.amount,
+                    denom: _denom.to_string(),
+                }],
             })),
         }
     }
@@ -224,9 +238,7 @@ impl AssetInfo {
                 if denom == "uluna" {
                     return true;
                 } else if denom.starts_with('u') {
-                    return query_active_denoms(querier)
-                        .map(|actives| actives.contains(denom))
-                        .unwrap_or(false);
+                    return query_denom_info(querier, denom.to_string()).is_ok();
                 } else if denom.starts_with("ibc") {
                     return query_ibc_denom(querier, denom.to_string()).is_ok();
                 }

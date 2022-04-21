@@ -408,8 +408,8 @@ pub fn swap(
         spread_amount,
     )?;
 
-    // compute tax
-    let tax_amount = return_asset.compute_tax(&deps.querier)?;
+    #[cfg(feature = "terra")]
+    let tax_amount = return_asset.compute_tax(&deps.querier)?; // compute tax
     let receiver = to.unwrap_or_else(|| sender.clone());
 
     let mut messages: Vec<CosmosMsg> = vec![];
@@ -427,6 +427,7 @@ pub fn swap(
         ("ask_asset", &ask_pool.info.to_string()),
         ("offer_amount", &offer_amount.to_string()),
         ("return_amount", &return_amount.to_string()),
+        #[cfg(feature = "terra")]
         ("tax_amount", &tax_amount.to_string()),
         ("spread_amount", &spread_amount.to_string()),
         ("commission_amount", &commission_amount.to_string()),

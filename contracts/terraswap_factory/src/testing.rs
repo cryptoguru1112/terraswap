@@ -273,6 +273,7 @@ fn fail_to_create_same_pair() {
 }
 
 #[test]
+#[should_panic]
 fn fail_to_create_pair_with_unactive_denoms() {
     let mut deps = mock_dependencies(&[]);
     deps = init(deps);
@@ -290,7 +291,7 @@ fn fail_to_create_pair_with_unactive_denoms() {
 
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
-    execute(deps.as_mut(), env, info, msg).unwrap_err();
+    execute(deps.as_mut(), env, info, msg).unwrap();
 }
 
 #[test]
